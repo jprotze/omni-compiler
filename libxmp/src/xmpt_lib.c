@@ -2,6 +2,7 @@
 #define _GNU_SOURCE
 #include <dlfcn.h>
 #include "xmp_internal.h"
+#include <stdlib.h>
 
 xmpt_callback_t xmpt_callback[XMPT_EVENT_ALL+1] = { 0 };
 int xmpt_support_level[XMPT_EVENT_ALL+1] = {
@@ -44,6 +45,15 @@ int xmpt_support_level[XMPT_EVENT_ALL+1] = {
   2, /* xmpt_event_sync_images_all_end */
   4, /* xmpt_event_sync_images_begin */
   4, /* xmpt_event_sync_images_end */
+
+  2, /* xmpt_event_nodes_desc_begin */
+  2, /* xmpt_event_nodes_desc_end */
+  2, /* xmpt_event_template_desc_begin */
+  2, /* xmpt_event_template_desc_end */
+  2, /* xmpt_event_array_desc_begin */
+  2, /* xmpt_event_array_desc_end */
+  2, /* xmpt_event_template_fix */
+
   0  /* XMPT_EVENT_ALL */
 };
 
@@ -53,13 +63,39 @@ int __attribute__((weak)) xmpt_initialize(){
   int (*next_tool)() = (int(*)()) dlsym(RTLD_NEXT, "xmpt_initialize");
   if (next_tool)
     ret = next_tool();
+  if (ret)
+    return ret;
+  const char *tool_libs = getenv("XMP_TOOL_LIBRARIES");
+  if (tool_libs) {
+    char* tool_libs_buffer = strdup(tool_libs);
+    if(!tool_libs_buffer)
+    {
+      printf("malloc Error\n");
+      return(0);
+    }
+    char *fname = strtok(tool_libs_buffer,":");
+    while (fname) {
+      void *h = dlopen(fname, RTLD_LAZY);
+      if (h) {
+        next_tool = (int(*)()) dlsym(h, "xmpt_initialize");
+        if (next_tool && (ret = next_tool())) {
+          break;
+        }
+      }
+      else{
+        printf("Loading %s from %s failed with: %s\n" ,fname, "XMP_TOOL_LIBRARIES", dlerror());
+      }
+      fname = strtok(NULL,":");
+    }
+    free(tool_libs_buffer);
+  }
   return ret;
 }
 
-xmp_desc_t on_desc;
+/*xmp_desc_t on_desc;
 struct _xmpt_subscript_t on_subsc;
 xmp_desc_t from_desc;
-struct _xmpt_subscript_t from_subsc;
+struct _xmpt_subscript_t from_subsc;*/
 
 int xmpt_set_callback(xmpt_event_t event, xmpt_callback_t callback){
 

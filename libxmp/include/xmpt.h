@@ -166,6 +166,15 @@ typedef enum xmpt_event_e {
   xmpt_event_sync_images_begin     = 37,
   xmpt_event_sync_images_end       = 38,
 
+  // data mapping
+  xmpt_event_nodes_desc_begin      = 39,
+  xmpt_event_nodes_desc_end        = 40,
+  xmpt_event_template_desc_begin   = 41,
+  xmpt_event_template_desc_end     = 42,
+  xmpt_event_array_desc_begin      = 43,
+  xmpt_event_array_desc_end        = 44,
+  xmpt_event_template_fix          = 45,
+
   XMPT_EVENT_ALL
   
 } xmpt_event_t;
@@ -186,6 +195,13 @@ typedef void (*xmpt_event_single_desc_begin_async_t) (
   xmpt_subscript_t subsc,      /* subscript specification */
   xmpt_async_id_t async_id,    /* async-id */
   xmpt_tool_data_t* data       /* pointer to store tool specific data */
+);
+
+typedef void (*xmpt_event_task_begin_t) (
+  xmp_desc_t desc,            /* descriptor for either nodes, template or array */
+  xmpt_subscript_t subsc,     /* subscript specification */
+  int is_active,              /* flag whether or not the node joins to execute the task. */
+  xmpt_tool_data_t* data      /* pointer to store tool specific data */
 );
 
 typedef void (*xmpt_event_gmove_begin_t) (
@@ -292,10 +308,10 @@ int xmpt_desc_get_data(xmp_desc_t d, xmpt_tool_data_t* data) __attribute__ ((vis
 extern xmpt_callback_t xmpt_callback[XMPT_EVENT_ALL+1];
 extern int xmpt_enabled;
 
-extern xmp_desc_t on_desc;
+/*extern xmp_desc_t on_desc;
 extern struct _xmpt_subscript_t on_subsc;
 extern xmp_desc_t from_desc;
-extern struct _xmpt_subscript_t from_subsc;
+extern struct _xmpt_subscript_t from_subsc;*/
 
 #endif // _XMP_TOOLAPI
 

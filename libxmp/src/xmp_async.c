@@ -53,9 +53,11 @@ void _XMP_initialize_async_comm_tab()
     _XMP_async_comm_tab[i].nreqs   = 0;
     _XMP_async_comm_tab[i].nnodes  = 0;
     _XMP_async_comm_tab[i].is_used = false;
+    _XMP_async_comm_tab[i].type    = _XMP_COMM_NONE;
     _XMP_async_comm_tab[i].node    = NULL;
     _XMP_async_comm_tab[i].reqs    = NULL;
     _XMP_async_comm_tab[i].gmove   = NULL;
+    _XMP_async_comm_tab[i].a       = NULL;
     _XMP_async_comm_tab[i].next    = NULL;
   }
 }
@@ -85,13 +87,14 @@ void xmpc_wait_async(int async_id, _XMP_object_ref_t *on_desc)
     _XMP_nodes_t *n;
     _XMP_create_task_nodes(&n, on_desc);
     if (_XMP_test_task_on_nodes(n)){
-      _XMP_wait_async__(async_id);
+      _XMP_wait_async__(async_id, on_desc);
       _XMP_end_task();
     }
     _XMP_finalize_nodes(n);
   }
   else {
-    _XMP_wait_async__(async_id);
+    
+    _XMP_wait_async__(async_id, on_desc);
   }
   
   xmpc_end_async(async_id);
@@ -102,18 +105,29 @@ void xmpc_wait_async(int async_id, _XMP_object_ref_t *on_desc)
 /* DESCRIPTION : Wait until completing asynchronous communication. */
 /* ARGUMENT    : [IN] async_id : ID of async                       */
 /*******************************************************************/
-void _XMP_wait_async__(int async_id)
+void _XMP_wait_async__(int async_id, _XMP_object_ref_t *r_desc)
 {
   _XMP_async_comm_t *async;
 
 #ifdef _XMPT
+
   xmpt_tool_data_t data = NULL;
   if (xmpt_enabled && xmpt_callback[xmpt_event_wait_async_begin]){
+    xmp_desc_t on_desc;
+    if (r_desc){
+      on_desc = r_desc->ref_kind == XMP_OBJ_REF_NODES ?
+        (xmp_desc_t)r_desc->n_desc : (xmp_desc_t)r_desc->t_desc;
+    }
+    else {
+      on_desc = (xmp_desc_t)_XMP_get_execution_nodes();
+    }
+    struct _xmpt_subscript_t on_subsc;
+    _XMPT_set_subsc(&on_subsc, r_desc);
     //    xmp_desc_t on_desc;
     //    struct _xmpt_subscript_t on_subsc;
     (*(xmpt_event_wait_async_begin_t)xmpt_callback[xmpt_event_wait_async_begin])(
       (xmpt_async_id_t)async_id,
-      &on_desc,
+      on_desc,
       &on_subsc,
       &data);
   }
@@ -134,7 +148,11 @@ void _XMP_wait_async__(int async_id)
 
   _XMP_async_gmove_t *gmove = async->gmove;
 
-  if (!gmove || gmove->mode == _XMP_N_GMOVE_NORMAL){
+  if (async->type == _XMP_COMM_REDUCE_SHADOW){
+    MPI_Waitall(nreqs, reqs, MPI_STATUSES_IGNORE);
+    _XMP_reduce_shadow_sum(async->a);
+  }
+  else if (!gmove || gmove->mode == _XMP_N_GMOVE_NORMAL){
     _XMP_TSTART(t0);
     MPI_Waitall(nreqs, reqs, MPI_STATUSES_IGNORE);
     _XMP_TEND(xmptiming_.t_wait, t0);
@@ -184,6 +202,8 @@ int xmp_test_async_(int *async_id)
   if(flag){
     _XMP_async_gmove_t *gmove = async->gmove;
     if (gmove) _XMP_finalize_async_gmove(gmove);
+    else if(async->type == _XMP_COMM_REDUCE_SHADOW)
+      _XMP_reduce_shadow_sum(async->a);
 
     xmpc_end_async(*async_id);
     return 1;
@@ -280,9 +300,11 @@ void xmpc_init_async(int async_id)
       async->nreqs    = 0;
       async->nnodes   = 0;
       async->is_used  = true;
+      async->type     = _XMP_COMM_NONE;
       async->node     = NULL;
       async->reqs     = _XMP_alloc(sizeof(MPI_Request) * _XMP_MAX_ASYNC_REQS);
       async->gmove    = NULL;
+      async->a        = NULL;
       async->next     = NULL;
       _tmp_async      = async;
     }
@@ -338,6 +360,8 @@ static void initialize_async(_XMP_async_comm_t *async)
   async->nreqs   = 0;
   async->nnodes  = 0;
   async->is_used = false;
+  async->type    = _XMP_COMM_NONE;
+  async->a       = NULL;
   async->next    = NULL;
 }
 
@@ -372,9 +396,11 @@ void xmpc_end_async(int async_id)
       async->nreqs    = next->nreqs;
       async->nnodes   = next->nnodes;
       async->is_used  = next->is_used;
+      async->type     = next->type;
       async->node     = next->node;
       async->gmove    = next->gmove;
       async->reqs     = next->reqs;
+      async->a        = next->a;
       async->next     = next->next;
       _XMP_free(next);
     }
