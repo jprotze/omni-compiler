@@ -281,9 +281,9 @@ typedef void (*xmpt_callback_t);
 extern "C" {
 #endif
 
-int xmpt_set_callback(xmpt_event_t, xmpt_callback_t);
-int xmpt_desc_set_data(xmp_desc_t d, xmpt_tool_data_t data);
-int xmpt_desc_get_data(xmp_desc_t d, xmpt_tool_data_t* data);
+int xmpt_set_callback(xmpt_event_t, xmpt_callback_t) __attribute__ ((visibility ("default")));
+int xmpt_desc_set_data(xmp_desc_t d, xmpt_tool_data_t data) __attribute__ ((visibility ("default")));
+int xmpt_desc_get_data(xmp_desc_t d, xmpt_tool_data_t* data) __attribute__ ((visibility ("default")));
 
 #ifdef  __cplusplus
 }

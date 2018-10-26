@@ -10317,7 +10317,7 @@ fi
 
     chk=`${MPI_CC} --version | head -n1`
     case $chk in
-	cc* | gcc* | Apple*)
+	cc* | gcc* | clang* | Apple*)
 	    # OpenMP
 	    OPENMP_OPT_C="-fopenmp"
 
@@ -10771,7 +10771,7 @@ else
     fi
     chk=`${CC} --version | head -n1`
     case $chk in
-	cc* | gcc* | Apple* | *ICC*)
+	cc* | gcc* | clang* | Apple* | *ICC*)
 	    CFLAGS="${CFLAGS} -std=gnu99 -Wall -Wpointer-arith"
 	    ;;
 	*)
